@@ -35,9 +35,14 @@ intents.message_content = True
 # Bot setup
 bot = commands.Bot(command_prefix="/", intents=intents)
 
+# Add this global variable at the top (after bot is created)
+main_loop = None
+
 # Bot ready-up code
 @bot.event
 async def on_ready():
+    global main_loop
+    main_loop = asyncio.get_running_loop()  # Save the main event loop
     await bot.tree.sync()
     print(f"{bot.user} is online!")
 
@@ -191,10 +196,12 @@ async def play_next_song(voice_client, guild_id, channel):
         def after_play(error):
             if error:
                 print(f"Error playing {title}: {error}")
-            asyncio.create_task(play_next_song(voice_client, guild_id, channel))
+            # Use the saved main_loop instead of get_event_loop()
+            if main_loop and not main_loop.is_closed():
+                asyncio.run_coroutine_threadsafe(play_next_song(voice_client, guild_id, channel), main_loop)
 
         voice_client.play(source, after=after_play)
-        asyncio.create_task(channel.send(f"Now playing: **{title}**"))
+        await channel.send(f"Now playing: **{title}**")
     else:
         await voice_client.disconnect()
         SONG_QUEUES[guild_id] = deque()
