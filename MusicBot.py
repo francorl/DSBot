@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 import yt_dlp # NEW
 from collections import deque # NEW
 import asyncio # NEW
+from concurrent.futures import ThreadPoolExecutor
 
+
+yt_executor = ThreadPoolExecutor(max_workers=4)
 
 # Environment variables for tokens and other sensitive data
 load_dotenv()
@@ -18,7 +21,7 @@ SONG_QUEUES = {}
 
 async def search_ytdlp_async(query, ydl_opts):
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, lambda: _extract(query, ydl_opts))
+    return await loop.run_in_executor(yt_executor, lambda: _extract(query, ydl_opts))
 
 def _extract(query, ydl_opts):
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -188,7 +191,7 @@ async def play_next_song(voice_client, guild_id, channel):
         def after_play(error):
             if error:
                 print(f"Error playing {title}: {error}")
-            asyncio.run_coroutine_threadsafe(play_next_song(voice_client, guild_id, channel), bot.loop)
+            asyncio.create_task(play_next_song(voice_client, guild_id, channel))
 
         voice_client.play(source, after=after_play)
         asyncio.create_task(channel.send(f"Now playing: **{title}**"))
