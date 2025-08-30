@@ -168,13 +168,14 @@ async def play(interaction: discord.Interaction, song_query: str):
     if SONG_QUEUES.get(guild_id) is None:
         SONG_QUEUES[guild_id] = deque()
 
+    # Only store the query/URL and title in the queue
     for track in tracks:
-        audio_url = track["url"]
+        track_query = track.get("webpage_url", track.get("url", song_query))
         title = track.get("title", "Untitled")
-        SONG_QUEUES[guild_id].append((audio_url, title))
+        SONG_QUEUES[guild_id].append((track_query, title))
 
     if len(tracks) == 1:
-        message = f"Now playing: **{tracks[0]['title']}**"
+        message = f"Added to queue: **{tracks[0]['title']}**"
     else:
         message = f"Queued **{len(tracks)}** tracks from playlist."
 
@@ -186,12 +187,27 @@ async def play(interaction: discord.Interaction, song_query: str):
 
 async def play_next_song(voice_client, guild_id, channel):
     if SONG_QUEUES[guild_id]:
-        audio_url, title = SONG_QUEUES[guild_id].popleft()
+        track_query, title = SONG_QUEUES[guild_id].popleft()
+
+        # Download audio_url only now
+        ydl_options = {
+            "format": "bestaudio[abr<=96]/bestaudio",
+            "quiet": True,
+            "extract_flat": False,
+        }
+        try:
+            result = await search_ytdlp_async(track_query, ydl_options)
+            audio_url = result["url"]
+        except Exception as e:
+            await channel.send(f"Error fetching audio for **{title}**: {e}")
+            # Try next song
+            if main_loop and not main_loop.is_closed():
+                asyncio.run_coroutine_threadsafe(play_next_song(voice_client, guild_id, channel), main_loop)
+            return
 
         ffmpeg_options = {
             "before_options": "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5",
             "options": "-vn -c:a libopus -b:a 96k",
-            # Remove executable if FFmpeg is in PATH
         }
 
         source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_options, executable="bin\\ffmpeg\\ffmpeg.exe")
@@ -199,7 +215,6 @@ async def play_next_song(voice_client, guild_id, channel):
         def after_play(error):
             if error:
                 print(f"Error playing {title}: {error}")
-            # Use the saved main_loop instead of get_event_loop()
             if main_loop and not main_loop.is_closed():
                 asyncio.run_coroutine_threadsafe(play_next_song(voice_client, guild_id, channel), main_loop)
 
@@ -210,6 +225,10 @@ async def play_next_song(voice_client, guild_id, channel):
         SONG_QUEUES[guild_id] = deque()
 
 
+@bot.tree.command(name="ping", description="Show the bot's latency (ping).")
+async def ping(interaction: discord.Interaction):
+    latency_ms = round(bot.latency * 1000)
+    await interaction.response.send_message(f"Pong! Latency: {latency_ms} ms")
 
 
 # Run the bot
