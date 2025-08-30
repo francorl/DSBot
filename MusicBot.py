@@ -43,6 +43,9 @@ main_loop = None
 async def on_ready():
     global main_loop
     main_loop = asyncio.get_running_loop()  # Save the main event loop
+    # Set custom status here
+    activity = discord.Activity(type=discord.ActivityType.playing, name="Unreal Engine 5")
+    await bot.change_presence(activity=activity)
     await bot.tree.sync()
     print(f"{bot.user} is online!")
 
@@ -206,7 +209,7 @@ async def play_next_song(voice_client, guild_id, channel):
         await voice_client.disconnect()
         SONG_QUEUES[guild_id] = deque()
 
-        
+
 
 
 # Run the bot
