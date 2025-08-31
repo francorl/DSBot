@@ -1,0 +1,12 @@
+
+discord.py>=2.3.2
+python-dotenv>=1.0.0
+yt-dlp>=2023.7.6
+
+asyncio>=3.4.3
+
+
+PyNaCl>=1.5.0  # Required for voice support
+ffmpeg-python>=0.2.0  # For audio processing
+
+aiohttp>=3.8.5  # For better async HTTP requests
